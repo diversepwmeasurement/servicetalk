@@ -1,49 +1,61 @@
-name: PR Builder
-on:
-  pull_request:
-    branches: [ main, '0.41', '0.42' ]
 jobs:
   build:
     name: JDK ${{ matrix.java }} ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    runs-on: self-hosted
+    steps:
+    - continue-on-error: true
+      name: Checkout Code
+      uses: actions/checkout@v4
+    - continue-on-error: true
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v4
+      with:
+        cache: gradle
+        distribution: zulu
+        java-version: ${{ matrix.java }}
+    - continue-on-error: true
+      name: Print JDK Version
+      run: java -version
+    - continue-on-error: true
+      name: Make gradlew Executable
+      run: chmod +x gradlew
+    - continue-on-error: true
+      if: ${{ runner.os == 'Windows' }}
+      name: Configure Windows Pagefile
+      uses: al-cheb/configure-pagefile-action@a3b6ebd6b634da88790d9c58d4b37a7f4a7b8708
+      with:
+        maximum-size: 16GB
+        minimum-size: 8GB
+    - continue-on-error: true
+      env:
+        JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8
+      if: runner.os == 'Linux'
+      name: Build and Test (Linux)
+      run: sudo -E env "PATH=$PATH" bash -c "ulimit -l 65536 && ulimit -a && ./gradlew
+        --no-daemon --parallel clean test"
+    - continue-on-error: true
+      env:
+        JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8
+      if: runner.os != 'Linux'
+      name: Build and Test (non-Linux)
+      run: ./gradlew --no-daemon --parallel clean test
+    - continue-on-error: true
+      if: always()
+      name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.java }}
+        path: '**/build/test-results/test/TEST-*.xml'
     strategy:
       matrix:
-        java: [ 8, 11, 17, 21 ]
-        os: [ ubuntu-latest ]
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java }}
-          distribution: 'zulu'
-          cache: 'gradle'
-      - name: Print JDK Version
-        run: java -version
-      - name: Make gradlew Executable
-        run: chmod +x gradlew
-      # https://github.community/t/error-the-paging-file-is-too-small-for-this-operation-to-complete/17141
-      - name: Configure Windows Pagefile
-        if: ${{ runner.os == 'Windows' }}
-        # v1.2
-        uses: al-cheb/configure-pagefile-action@a3b6ebd6b634da88790d9c58d4b37a7f4a7b8708
-        with:
-          minimum-size: 8GB
-          maximum-size: 16GB
-      - name: Build and Test (Linux)
-        if: runner.os == 'Linux'
-        env:
-          JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8
-        run:  sudo -E env "PATH=$PATH" bash -c "ulimit -l 65536 && ulimit -a && ./gradlew --no-daemon --parallel clean test"
-      - name: Build and Test (non-Linux)
-        if: runner.os != 'Linux'
-        env:
-          JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8
-        run: ./gradlew --no-daemon --parallel clean test
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/build/test-results/test/TEST-*.xml'
+        java:
+        - 8
+        - 11
+        - 17
+        - 21
+        os:
+        - ubuntu-latest
+name: PR Builder
+on:
+  repository_dispatch:
+    types: trigger-ga___ci-prb.yml

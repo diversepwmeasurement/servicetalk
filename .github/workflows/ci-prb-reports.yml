@@ -1,31 +1,34 @@
-name: PR Builder Reports
-on:
-  workflow_run:
-    workflows: [ "PR Builder" ]
-    types:
-      - completed
 jobs:
   tests:
-    runs-on: ubuntu-latest
-    strategy:
-      # Matrix should be coordinated with ci-prb.yml.
-      matrix:
-        java: [ 8, 11, 17, 21 ]
-        os: [ ubuntu-latest ]
+    runs-on: self-hosted
     steps:
-      - name: Download Artifacts
-        uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow: ${{ github.event.workflow_run.workflow_id }}
-          workflow_conclusion: completed
-          commit: ${{ github.event.workflow_run.head_commit.id }}
-          # File location set in ci-prb.yml and must be coordinated.
-          name: test-results-${{ matrix.os }}-${{ matrix.java }}
-      - name: Publish Test Report
-        uses: scacap/action-surefire-report@a2911bd1a4412ec18dde2d93b1758b3e56d2a880
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          report_paths: '**/build/test-results/test/TEST-*.xml'
-          commit: ${{ github.event.workflow_run.head_commit.id }}
-          check_name: Test Report JDK ${{ matrix.java }} ${{ matrix.os }}
+    - continue-on-error: true
+      name: Download Artifacts
+      uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe
+      with:
+        commit: ${{ github.event.workflow_run.head_commit.id }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        name: test-results-${{ matrix.os }}-${{ matrix.java }}
+        workflow: ${{ github.event.workflow_run.workflow_id }}
+        workflow_conclusion: completed
+    - continue-on-error: true
+      name: Publish Test Report
+      uses: scacap/action-surefire-report@a2911bd1a4412ec18dde2d93b1758b3e56d2a880
+      with:
+        check_name: Test Report JDK ${{ matrix.java }} ${{ matrix.os }}
+        commit: ${{ github.event.workflow_run.head_commit.id }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        report_paths: '**/build/test-results/test/TEST-*.xml'
+    strategy:
+      matrix:
+        java:
+        - 8
+        - 11
+        - 17
+        - 21
+        os:
+        - ubuntu-latest
+name: PR Builder Reports
+on:
+  repository_dispatch:
+    types: trigger-ga___ci-prb-reports.yml

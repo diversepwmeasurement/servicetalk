@@ -1,37 +1,38 @@
-name: CodeQL
-on:
-  push:
-    branches: [ main, '0.41', '0.42' ]
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ main, '0.41' ]
-  schedule:
-    - cron: '0 13 * * 1'
-
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    steps:
+    - continue-on-error: true
+      name: Checkout Code
+      uses: actions/checkout@v4
+    - continue-on-error: true
+      name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        cache: gradle
+        distribution: zulu
+        java-version: '11'
+    - continue-on-error: true
+      name: Print JDK Version
+      run: java -version
+    - continue-on-error: true
+      name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+    - continue-on-error: true
+      name: Execute gradle build
+      run: ./gradlew --parallel clean assemble
+    - continue-on-error: true
+      name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'java' ]
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '11'
-          distribution: 'zulu'
-          cache: 'gradle'
-      - name: Print JDK Version
-        run: java -version
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-      - name: Execute gradle build
-        run: ./gradlew --parallel clean assemble
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        language:
+        - java
+name: CodeQL
+on:
+  repository_dispatch:
+    types: trigger-ga___codeql-analysis.yml

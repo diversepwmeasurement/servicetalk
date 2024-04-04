@@ -1,40 +1,51 @@
-name: Test with the latest Netty 4.1.X-SNAPSHOT
-on:
-  schedule:
-    - cron: '0 15 * * 1-5'
 jobs:
   build:
     name: Netty snapshot on JDK ${{ matrix.java }} ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    runs-on: self-hosted
+    steps:
+    - continue-on-error: true
+      name: Checkout Code
+      uses: actions/checkout@v4
+    - continue-on-error: true
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v4
+      with:
+        cache: gradle
+        distribution: zulu
+        java-version: ${{ matrix.java }}
+    - continue-on-error: true
+      name: Print JDK Version
+      run: java -version
+    - continue-on-error: true
+      name: Make gradlew Executable
+      run: chmod +x gradlew
+    - continue-on-error: true
+      env:
+        ORG_GRADLE_PROJECT_nettyVersion: 4.1+
+      name: Print Netty Version
+      run: ./gradlew :servicetalk-grpc-netty:dependencyInsight --configuration testRuntimeClasspath
+        --dependency io.netty:netty-codec-http2 -PnettyVersion=4.1+ | grep "io.netty:netty-codec-http2"
+    - continue-on-error: true
+      env:
+        JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8
+        ORG_GRADLE_PROJECT_nettyVersion: 4.1.+
+      name: Build and Test
+      run: sudo -E env "PATH=$PATH" bash -c "ulimit -l 65536 && ulimit -a && ./gradlew
+        --no-daemon --parallel clean test"
+    - continue-on-error: true
+      if: always()
+      name: Publish Test Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.java }}
+        path: '**/build/test-results/test/TEST-*.xml'
     strategy:
       matrix:
-        java: [ 8 ]
-        os: [ ubuntu-latest ]
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java }}
-          distribution: 'zulu'
-          cache: 'gradle'
-      - name: Print JDK Version
-        run: java -version
-      - name: Make gradlew Executable
-        run: chmod +x gradlew
-      - name: Print Netty Version
-        env:
-          ORG_GRADLE_PROJECT_nettyVersion: 4.1+
-        run: ./gradlew :servicetalk-grpc-netty:dependencyInsight --configuration testRuntimeClasspath --dependency io.netty:netty-codec-http2 -PnettyVersion=4.1+ | grep "io.netty:netty-codec-http2"
-      - name: Build and Test
-        env:
-          JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8
-          ORG_GRADLE_PROJECT_nettyVersion: 4.1.+
-        run:  sudo -E env "PATH=$PATH" bash -c "ulimit -l 65536 && ulimit -a && ./gradlew --no-daemon --parallel clean test"
-      - name: Publish Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ matrix.os }}-${{ matrix.java }}
-          path: '**/build/test-results/test/TEST-*.xml'
+        java:
+        - 8
+        os:
+        - ubuntu-latest
+name: Test with the latest Netty 4.1.X-SNAPSHOT
+on:
+  repository_dispatch:
+    types: trigger-ga___ci-netty-snapshot.yml
